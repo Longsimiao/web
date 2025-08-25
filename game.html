@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班级乱斗 - 回合制游戏</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="common.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366F1',
+                        secondary: '#EC4899',
+                        accent: '#8B5CF6',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                        dark: '#1F2937',
+                        light: '#F3F4F6'
+                    },
+                    transitionProperty: {
+                        'height': 'height',
+                        'spacing': 'margin, padding',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* 补充必要的动画和过渡样式 */
+        .screen-transition {
+            transition: all 0.5s ease-in-out;
+        }
+        .card-hover {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.3);
+        }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .bg-gradient-game {
+            background: linear-gradient(135deg, #1a103c 0%, #2d1b69 100%);
+        }
+        .text-shadow {
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .text-shadow-lg {
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gradient-game min-h-screen text-white font-sans overflow-x-hidden">
+    <!-- 开始界面 -->
+    <div id="startScreen" class="flex flex-col items-center justify-center min-h-screen px-4 screen-transition">
+        <div class="text-center max-w-3xl mx-auto">
+            <h1 class="text-[clamp(2.5rem,8vw,5rem)] font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-6 text-shadow-lg animate-float">
+                班级乱斗
+            </h1>
+            <p class="text-[clamp(1rem,3vw,1.25rem)] mb-8 text-light/90">
+                回合制战斗游戏，选择3名角色组成你的队伍，击败对手！
+            </p>
+
+            <div class="bg-dark/70 backdrop-blur-lg p-6 rounded-xl mb-8 border border-primary/30">
+                <h2 class="text-[clamp(1.25rem,4vw,1.75rem)] font-bold mb-4 text-primary">游戏规则</h2>
+                <ul class="text-left space-y-3 text-light/90">
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-success mt-1 mr-3"></i>
+                        <span>选择3个角色组成你的队伍</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-success mt-1 mr-3"></i>
+                        <span>回合制战斗，每回合选择1个角色使用1个技能</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-success mt-1 mr-3"></i>
+                        <span>敌方每回合可以使用1次技能</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-success mt-1 mr-3"></i>
+                        <span>每回合结束后，角色的物、法攻会自动提升</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-success mt-1 mr-3"></i>
+                        <span>击败所有敌方角色获得胜利</span>
+                    </li>
+                </ul>
+            </div>
+
+            <button id="startButton" class="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-bold py-4 px-8 rounded-full text-[clamp(1rem,3vw,1.25rem)] transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-primary/50 shadow-lg shadow-primary/30">
+                开始游戏
+            </button>
+        </div>
+    </div>
+
+    <!-- 角色选择界面 -->
+    <div id="characterSelectScreen" class="hidden min-h-screen p-4 screen-transition opacity-0 transform translate-y-10">
+        <div class="container mx-auto">
+            <div class="text-center mb-8">
+                <h2 class="text-[clamp(1.75rem,5vw,2.5rem)] font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-4 text-shadow">
+                    选择你的角色
+                </h2>
+                <p class="text-light/80 text-[clamp(1rem,2vw,1.1rem)]">
+                    从下方选择3个角色组成你的队伍
+                </p>
+                <div class="mt-4 flex justify-center">
+                    <div id="selectedCount" class="bg-dark/70 backdrop-blur-lg px-6 py-2 rounded-full border border-primary/30">
+                        <span class="text-primary font-bold">已选择: </span>
+                        <span id="selectedCharactersCount" class="text-white">0</span>/3
+                    </div>
+                </div>
+            </div>
+
+            <div id="selectedCharactersContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div class="selected-character-slot bg-dark/50 backdrop-blur-sm rounded-xl p-4 border-2 border-dashed border-primary/30 flex flex-col items-center justify-center h-48">
+                    <i class="fas fa-plus text-primary/70 text-3xl mb-2"></i>
+                    <p class="text-light/60">选择第一个角色</p>
+                </div>
+                <div class="selected-character-slot bg-dark/50 backdrop-blur-sm rounded-xl p-4 border-2 border-dashed border-primary/30 flex flex-col items-center justify-center h-48">
+                    <i class="fas fa-plus text-primary/70 text-3xl mb-2"></i>
+                    <p class="text-light/60">选择第二个角色</p>
+                </div>
+                <div class="selected-character-slot bg-dark/50 backdrop-blur-sm rounded-xl p-4 border-2 border-dashed border-primary/30 flex flex-col items-center justify-center h-48">
+                    <i class="fas fa-plus text-primary/70 text-3xl mb-2"></i>
+                    <p class="text-light/60">选择第三个角色</p>
+                </div>
+            </div>
+
+            <div class="bg-dark/70 backdrop-blur-lg rounded-xl p-6 border border-primary/30 mb-6">
+                <h3 class="text-xl font-bold mb-4 text-primary">角色列表</h3>
+                <div id="charactersGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto scrollbar-hide p-2">
+                </div>
+            </div>
+
+            <div class="flex justify-center">
+                <button id="startBattleButton" class="bg-gradient-to-r from-success to-primary hover:from-success/90 hover:to-primary/90 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-success/50 shadow-lg shadow-success/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none" disabled>
+                    开始战斗
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏界面 -->
+    <div id="gameScreen" class="hidden min-h-screen p-4 screen-transition opacity-0 transform translate-y-10">
+        <div class="container mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6">
+                <div class="bg-dark/70 backdrop-blur-lg px-6 py-3 rounded-full border border-primary/30 mb-4 md:mb-0">
+                    <span class="text-primary font-bold">回合: </span>
+                    <span id="currentTurnDisplay" class="text-white">1</span>
+                </div>
+
+                <div class="flex space-x-4">
+                    <button id="restartButton" class="bg-gradient-to-r from-warning to-danger hover:from-warning/90 hover:to-danger/90 text-white font-bold py-2 px-6 rounded-full transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-warning/50 shadow-lg shadow-warning/30">
+                        <i class="fas fa-redo mr-2"></i>重新开始
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-dark/70 backdrop-blur-lg rounded-xl p-6 border border-danger/30">
+                    <h3 class="text-xl font-bold mb-4 text-danger flex items-center">
+                        <i class="fas fa-skull mr-2"></i>敌方队伍
+                    </h3>
+                    <div id="enemyTeamContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    </div>
+                </div>
+
+                <div class="bg-dark/70 backdrop-blur-lg rounded-xl p-6 border border-success/30">
+                    <h3 class="text-xl font-bold mb-4 text-success flex items-center">
+                        <i class="fas fa-shield-alt mr-2"></i>你的队伍
+                    </h3>
+                    <div id="playerTeamContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-dark/70 backdrop-blur-lg rounded-xl p-6 border border-primary/30 mb-6">
+                <h3 class="text-xl font-bold mb-4 text-primary flex items-center">
+                    <i class="fas fa-history mr-2"></i>战斗日志
+                </h3>
+                <div id="battleLogContainer" class="bg-dark/50 rounded-lg p-4 max-h-40 overflow-y-auto scrollbar-hide text-sm">
+                    <p class="text-light/70 italic">战斗开始！选择你的角色和技能进行攻击。</p>
+                </div>
+            </div>
+
+            <div id="skillSelectionArea" class="bg-dark/70 backdrop-blur-lg rounded-xl p-6 border border-primary/30 mb-6">
+                <h3 class="text-xl font-bold mb-4 text-primary flex items-center">
+                    <i class="fas fa-magic mr-2"></i>技能选择
+                </h3>
+                <div id="characterSelection" class="mb-4">
+                    <h4 class="text-light/80 mb-2">选择角色:</h4>
+                    <div id="characterButtons" class="flex flex-wrap gap-2">
+                    </div>
+                </div>
+                <div id="skillButtonsContainer" class="mb-4">
+                    <h4 class="text-light/80 mb-2">选择技能:</h4>
+                    <div id="skillButtons" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <p class="text-light/60 italic col-span-full text-center py-4">请先选择一个角色</p>
+                    </div>
+                </div>
+                <div id="targetSelection" class="hidden">
+                    <h4 class="text-light/80 mb-2">选择目标:</h4>
+                    <div id="targetButtons" class="flex flex-wrap gap-2">
+                    </div>
+                </div>
+            </div>
+
+            <div id="gameResultModal" class="hidden fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50">
+                <div class="bg-dark rounded-xl p-8 max-w-md w-full mx-4 border-2 border-primary/50 shadow-2xl shadow-primary/20 transform transition-all duration-500 scale-100">
+                    <div class="text-center">
+                        <h2 id="resultTitle" class="text-2xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
+                            战斗结果
+                        </h2>
+                        <div id="resultIcon" class="text-6xl mb-6">
+                            <i class="fas fa-trophy text-warning animate-bounce"></i>
+                        </div>
+                        <p id="resultMessage" class="text-light/90 mb-8 text-lg">
+                            恭喜你赢得了战斗！
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button id="playAgainButton" class="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-bold py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-primary/50 shadow-lg shadow-primary/30">
+                                再来一局
+                            </button>
+                            <button id="backToMenuButton" class="bg-gradient-to-r from-dark to-dark/70 hover:from-dark/90 hover:to-dark/50 text-white font-bold py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-dark/50 shadow-lg shadow-dark/30 border border-light/20">
+                                返回菜单
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        // 状态管理（用于跟踪技能带来的临时效果）
+        let buffs = {
+            player: [], // 玩家方状态：{ targetIndex, type, value, duration, ... }
+            enemy: []   // 敌方状态
+        };
+
+        // 游戏状态变量
+        let characterResources = {
+            player: [],
+            enemy: []
+        };
+        let selectedCharacters = [];
+        let playerTeam = [];
+        let enemyTeam = [];
+        let currentTurn = 1;
+        let selectedCharacter = null;
+        let selectedSkill = null;
+        let isProcessingAction = false; // 新增：技能处理状态锁，防止快速点击
+
+        // DOM元素
+        const startScreen = document.getElementById('startScreen');
+        const characterSelectScreen = document.getElementById('characterSelectScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const startButton = document.getElementById('startButton');
+        const startBattleButton = document.getElementById('startBattleButton');
+        const selectedCharactersCount = document.getElementById('selectedCharactersCount');
+        const selectedCharactersContainer = document.getElementById('selectedCharactersContainer');
+        const charactersGrid = document.getElementById('charactersGrid');
+        const currentTurnDisplay = document.getElementById('currentTurnDisplay');
+        const playerTeamContainer = document.getElementById('playerTeamContainer');
+        const enemyTeamContainer = document.getElementById('enemyTeamContainer');
+        const battleLogContainer = document.getElementById('battleLogContainer');
+        const characterButtons = document.getElementById('characterButtons');
+        const skillButtonsContainer = document.getElementById('skillButtonsContainer');
+        const skillButtons = document.getElementById('skillButtons');
+        const targetSelection = document.getElementById('targetSelection');
+        const targetButtons = document.getElementById('targetButtons');
+        const gameResultModal = document.getElementById('gameResultModal');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultMessage = document.getElementById('resultMessage');
+        const resultIcon = document.getElementById('resultIcon');
+        const restartButton = document.getElementById('restartButton');
+        const playAgainButton = document.getElementById('playAgainButton');
+        const backToMenuButton = document.getElementById('backToMenuButton');
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', async () => {
+
+
+            // 初始化游戏事件监听
+            initGameEventListeners();
+        });
+
+        // 初始化游戏事件监听
+        function initGameEventListeners() {
+            // 开始游戏按钮
+            startButton.addEventListener('click', () => {
+                startScreen.classList.add('opacity-0', 'translate-y-10');
+                setTimeout(() => {
+                    startScreen.classList.add('hidden');
+                    characterSelectScreen.classList.remove('hidden');
+                    setTimeout(() => {
+                        characterSelectScreen.classList.remove('opacity-0', 'translate-y-10');
+                    }, 50);
+                    // 加载角色列表
+                    loadCharacters();
+                }, 500);
+            });
+
+            // 开始战斗按钮
+            startBattleButton.addEventListener('click', startBattle);
+
+            // 重新开始按钮
+            restartButton.addEventListener('click', restartGame);
+
+            // 再来一局按钮
+            playAgainButton.addEventListener('click', () => {
+                gameResultModal.classList.add('hidden');
+                restartGame();
+            });
+
+            // 返回菜单按钮
+            backToMenuButton.addEventListener('click', () => {
+                gameResultModal.classList.add('hidden');
+                resetGame();
+                gameScreen.classList.add('opacity-0', 'translate-y-10');
+                setTimeout(() => {
+                    gameScreen.classList.add('hidden');
+                    startScreen.classList.remove('hidden');
+                    setTimeout(() => {
+                        startScreen.classList.remove('opacity-0', 'translate-y-10');
+                    }, 50);
+                }, 500);
+            });
+        }
+
+        // 加载角色列表
+        function loadCharacters() {
+            charactersGrid.innerHTML = '';
+
+            // 从common.js中获取角色数据
+            gameCharacters.forEach((character, index) => {
+                const characterCard = document.createElement('div');
+                characterCard.className = 'bg-dark/50 backdrop-blur-sm rounded-xl p-4 border border-primary/30 card-hover cursor-pointer';
+                characterCard.innerHTML = `
+                    <h3 class="font-bold text-lg mb-2 text-primary">${character.name}</h3>
+                    <div class="space-y-1 text-sm text-light/80">
+                        <p><i class="fas fa-heart text-danger mr-1"></i> 生命值: ${character.base_hp}</p>
+                        <p><i class="fas fa-fist-raised text-warning mr-1"></i> 物攻: ${character.base_physical_attack || '-'}</p>
+                        <p><i class="fas fa-shield text-success mr-1"></i> 物抗: ${character.base_physical_defense}</p>
+                        ${character.base_magical_attack ? `<p><i class="fas fa-magic text-accent mr-1"></i> 法攻: ${character.base_magical_attack}</p>` : ''}
+                        <p><i class="fas fa-shield-alt text-secondary mr-1"></i> 法抗: ${character.base_magical_defense}</p>
+                    </div>
+                `;
+
+                // 角色卡片点击事件（选择角色）
+                characterCard.addEventListener('click', () => {
+                    if (selectedCharacters.length < 3 && !selectedCharacters.includes(index)) {
+                        selectedCharacters.push(index);
+                        updateSelectedCharacters();
+                    }
+                });
+
+                charactersGrid.appendChild(characterCard);
+            });
+        }
+
+        // 更新已选择的角色显示
+        function updateSelectedCharacters() {
+            selectedCharactersCount.textContent = selectedCharacters.length;
+            selectedCharactersContainer.innerHTML = '';
+
+            // 更新已选角色槽位
+            for (let i = 0; i < 3; i++) {
+                const slot = document.createElement('div');
+                if (i < selectedCharacters.length) {
+                    const character = gameCharacters[selectedCharacters[i]];
+                    slot.className = 'selected-character-slot bg-dark/50 backdrop-blur-sm rounded-xl p-4 border-2 border-primary/50 flex flex-col items-center justify-center h-48 card-hover';
+                    slot.innerHTML = `
+                        <h3 class="font-bold text-lg mb-2 text-primary">${character.name}</h3>
+                        <div class="space-y-1 text-sm text-light/80 text-center">
+                            <p><i class="fas fa-heart text-danger mr-1"></i> 生命值: ${character.base_hp}</p>
+                            <p><i class="fas fa-fist-raised text-warning mr-1"></i> 物攻: ${character.base_physical_attack || '-'}</p>
+                            <p><i class="fas fa-shield text-success mr-1"></i> 物抗: ${character.base_physical_defense}</p>
+                        </div>
+                        <button class="mt-4 text-danger hover:text-danger/80 focus:outline-none" data-index="${i}">
+                            <i class="fas fa-times"></i> 移除
+                        </button>
+                    `;
+
+                    // 移除按钮事件
+                    slot.querySelector('button').addEventListener('click', (e) => {
+                        const index = parseInt(e.currentTarget.dataset.index);
+                        selectedCharacters.splice(index, 1);
+                        updateSelectedCharacters();
+                        e.stopPropagation();
+                    });
+                } else {
+                    slot.className = 'selected-character-slot bg-dark/50 backdrop-blur-sm rounded-xl p-4 border-2 border-dashed border-primary/30 flex flex-col items-center justify-center h-48';
+                    slot.innerHTML = `
+                        <i class="fas fa-plus text-primary/70 text-3xl mb-2"></i>
+                        <p class="text-light/60">选择第${i + 1}个角色</p>
+                    `;
+                }
+                selectedCharactersContainer.appendChild(slot);
+            }
+
+            // 启用/禁用开始战斗按钮
+            startBattleButton.disabled = selectedCharacters.length !== 3;
+        }
+
+        // 开始战斗
+        function startBattle() {
+            // 初始化玩家队伍
+            playerTeam = selectedCharacters.map(index => {
+                const char = JSON.parse(JSON.stringify(gameCharacters[index]));
+                return {
+                    ...char,
+                    current_hp: char.base_hp,
+                    current_physical_attack: char.base_physical_attack,
+                    current_physical_defense: char.base_physical_defense,
+                    current_magical_attack: char.base_magical_attack,
+                    current_magical_defense: char.base_magical_defense,
+                    skillCooldowns: Array(char.skills.length).fill(0),
+                    copiedSkill: null,
+                    isAlive: true
+                };
+            });
+
+            // 随机选择3个敌方角色（不与玩家重复）
+            const availableEnemies = gameCharacters
+                .map((_, index) => index)
+                .filter(index => !selectedCharacters.includes(index));
+
+            const enemyIndices = [];
+            while (enemyIndices.length < 3 && availableEnemies.length > 0) {
+                const randomIndex = Math.floor(Math.random() * availableEnemies.length);
+                enemyIndices.push(availableEnemies.splice(randomIndex, 1)[0]);
+            }
+
+            // 初始化敌方队伍
+            enemyTeam = enemyIndices.map(index => {
+                const char = JSON.parse(JSON.stringify(gameCharacters[index]));
+                return {
+                    ...char,
+                    current_hp: char.base_hp,
+                    current_physical_attack: char.base_physical_attack,
+                    current_physical_defense: char.base_physical_defense,
+                    current_magical_attack: char.base_magical_attack,
+                    current_magical_defense: char.base_magical_defense,
+                    skillCooldowns: Array(char.skills.length).fill(0),
+                    copiedSkill: null,
+                    isAlive: true
+                };
+            });
+
+            // 初始化资源
+            characterResources.player = playerTeam.map(char => {
+                return char.resources ? JSON.parse(JSON.stringify(char.resources)) : {};
+            });
+            characterResources.enemy = enemyTeam.map(char => {
+                return char.resources ? JSON.parse(JSON.stringify(char.resources)) : {};
+            });
+
+            // 重置状态
+            currentTurn = 1;
+            buffs = { player: [], enemy: [] };
+            selectedCharacter = null;
+            selectedSkill = null;
+            isProcessingAction = false;
+
+            // 更新UI
+            currentTurnDisplay.textContent = currentTurn;
+            updateTeamDisplays();
+            updateCharacterSelection();
+
+            // 切换到游戏界面
+            characterSelectScreen.classList.add('opacity-0', 'translate-y-10');
+            setTimeout(() => {
+                characterSelectScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                setTimeout(() => {
+                    gameScreen.classList.remove('opacity-0', 'translate-y-10');
+                }, 50);
+            }, 500);
+
+            addBattleLog('战斗开始！准备迎接挑战！');
+        }
+
+        // 更新队伍显示
+        function updateTeamDisplays() {
+            // 更新玩家队伍
+            playerTeamContainer.innerHTML = '';
+            playerTeam.forEach((character, index) => {
+                const characterCard = createCharacterCard(character, index, 'player');
+                playerTeamContainer.appendChild(characterCard);
+            });
+
+            // 更新敌方队伍
+            enemyTeamContainer.innerHTML = '';
+            enemyTeam.forEach((character, index) => {
+                const characterCard = createCharacterCard(character, index, 'enemy');
+                enemyTeamContainer.appendChild(characterCard);
+            });
+        }
+
+        // 创建角色卡片
+        function createCharacterCard(character, index, team) {
+            const card = document.createElement('div');
+            const isAlive = character.isAlive;
+
+            // 计算生命值百分比
+            const hpPercent = Math.max(0, (character.current_hp / character.base_hp) * 100);
+            const hpColor = hpPercent > 50 ? 'bg-success' : hpPercent > 20 ? 'bg-warning' : 'bg-danger';
+
+            card.className = `bg-dark/50 backdrop-blur-sm rounded-xl p-4 border ${isAlive ? 'border-success/50' : 'border-gray-600'} relative ${!isAlive ? 'opacity-50' : ''}`;
+            card.innerHTML = `
+                <div class="absolute top-2 right-2 ${team === 'player' ? 'text-success' : 'text-danger'}">
+                    <i class="fas ${team === 'player' ? 'fa-user' : 'fa-skull'}"></i>
+                </div>
+                <h3 class="font-bold text-lg mb-2 text-primary ${!isAlive ? 'line-through' : ''}">${character.name}</h3>
+                <div class="mb-2">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span><i class="fas fa-heart text-danger mr-1"></i> 生命值</span>
+                        <span>${character.current_hp}/${character.base_hp}</span>
+                    </div>
+                    <div class="w-full bg-dark/70 rounded-full h-2.5">
+                        <div class="${hpColor} h-2.5 rounded-full" style="width: ${hpPercent}%"></div>
+                    </div>
+                </div>
+                <div class="space-y-1 text-sm text-light/80">
+                    <p><i class="fas fa-fist-raised text-warning mr-1"></i> 物攻: ${character.current_physical_attack || '-'}</p>
+                    <p><i class="fas fa-shield text-success mr-1"></i> 物抗: ${character.current_physical_defense}</p>
+                    ${character.current_magical_attack ? `<p><i class="fas fa-magic text-accent mr-1"></i> 法攻: ${character.current_magical_attack}</p>` : ''}
+                    <p><i class="fas fa-shield-alt text-secondary mr-1"></i> 法抗: ${character.current_magical_defense}</p>
+                </div>
+                ${character.copiedSkill ? `
+                    <div class="mt-2 text-xs bg-primary/20 p-1 rounded">
+                        <i class="fas fa-clone mr-1"></i> 复制技能: ${character.copiedSkill.name}
+                    </div>
+                ` : ''}
+            `;
+
+            return card;
+        }
+
+        // 更新角色选择按钮
+        function updateCharacterSelection() {
+            if (isProcessingAction) return; // 操作中不更新
+
+            characterButtons.innerHTML = '';
+
+            playerTeam.forEach((character, index) => {
+                if (character.isAlive) {
+                    const button = document.createElement('button');
+                    button.className = `px-4 py-2 rounded-lg ${selectedCharacter === index ? 'bg-primary' : 'bg-dark/70 hover:bg-primary/80'} transition-colors`;
+                    button.textContent = character.name;
+                    button.addEventListener('click', () => {
+                        if (isProcessingAction) return;
+                        selectedCharacter = index;
+                        selectedSkill = null;
+                        updateCharacterSelection();
+                        updateSkillSelection();
+                        targetSelection.classList.add('hidden');
+                    });
+                    characterButtons.appendChild(button);
+                }
+            });
+        }
+
+        // 更新技能选择按钮
+        function updateSkillSelection() {
+            if (selectedCharacter === null || isProcessingAction) return; // 操作中不更新
+
+            skillButtons.innerHTML = '';
+            const character = playerTeam[selectedCharacter];
+
+            // 显示复制的技能（如果有）
+            if (character.copiedSkill) {
+                const skillButton = createSkillButton('copied', character.copiedSkill, character.skillCooldowns.copied || 0);
+                skillButtons.appendChild(skillButton);
+            }
+
+            // 显示角色自身技能
+            character.skills.forEach((skill, index) => {
+                const isOnCooldown = character.skillCooldowns[index] > 0;
+                const skillButton = createSkillButton(index, skill, isOnCooldown ? character.skillCooldowns[index] : 0);
+                skillButtons.appendChild(skillButton);
+            });
+        }
+
+        // 创建技能按钮
+        function createSkillButton(index, skill, cooldown) {
+            const button = document.createElement('button');
+            const isOnCooldown = cooldown > 0;
+
+            button.className = `p-3 rounded-lg text-left bg-dark/50 hover:bg-primary/30 transition-colors ${isOnCooldown ? 'opacity-50 cursor-not-allowed' : ''} ${selectedSkill === index ? 'ring-2 ring-primary' : ''}`;
+            button.disabled = isOnCooldown || isProcessingAction; // 操作中禁用按钮
+
+            button.innerHTML = `
+                <div class="font-bold">${skill.name}</div>
+                <div class="text-xs text-light/70 mt-1">${skill.description}</div>
+                ${isOnCooldown ? `<div class="mt-1 text-xs text-warning"><i class="fas fa-clock mr-1"></i> 冷却中: ${cooldown}回合</div>` : ''}
+            `;
+
+            if (!isOnCooldown) {
+                button.addEventListener('click', () => {
+                    if (isProcessingAction) return;
+                    selectedSkill = index;
+                    updateSkillSelection();
+                    updateTargetSelection();
+                });
+            }
+
+            return button;
+        }
+
+        // 更新目标选择
+        function updateTargetSelection() {
+            if (selectedCharacter === null || selectedSkill === null || isProcessingAction) { // 操作中不显示
+                targetSelection.classList.add('hidden');
+                return;
+            }
+
+            const character = playerTeam[selectedCharacter];
+            let skill;
+
+            if (selectedSkill === 'copied' && character.copiedSkill) {
+                skill = character.copiedSkill;
+            } else {
+                skill = character.skills[selectedSkill];
+            }
+
+            // 根据技能类型决定目标选择
+            targetButtons.innerHTML = '';
+            targetSelection.classList.remove('hidden');
+
+            // 对敌方单体技能
+            if (['physical', 'magical', 'hybrid', 'dot', 'copy_skill'].includes(skill.type)) {
+                enemyTeam.forEach((enemy, index) => {
+                    if (enemy.isAlive) {
+                        const button = document.createElement('button');
+                        button.className = 'px-4 py-2 rounded-lg bg-dark/70 hover:bg-danger/30 transition-colors';
+                        button.textContent = enemy.name;
+                        button.disabled = isProcessingAction; // 操作中禁用按钮
+                        button.addEventListener('click', () => {
+                            useSkillOnTarget(index);
+                        });
+                        targetButtons.appendChild(button);
+                    }
+                });
+            }
+            // 群体技能
+            else if (skill.type === 'aoe_physical' || skill.type === 'aoe_magical') {
+                const button = document.createElement('button');
+                button.className = 'px-4 py-2 rounded-lg bg-dark/70 hover:bg-danger/30 transition-colors w-full';
+                button.textContent = '全体敌方';
+                button.disabled = isProcessingAction; // 操作中禁用按钮
+                button.addEventListener('click', () => {
+                    useSkillOnAllEnemies();
+                });
+                targetButtons.appendChild(button);
+            }
+            // 自身/队友技能
+            else if (['buff', 'team_buff', 'heal', 'self_buff', 'link'].includes(skill.type)) {
+                playerTeam.forEach((ally, index) => {
+                    if (ally.isAlive) {
+                        const button = document.createElement('button');
+                        button.className = 'px-4 py-2 rounded-lg bg-dark/70 hover:bg-success/30 transition-colors';
+                        button.textContent = ally.name;
+                        button.disabled = isProcessingAction; // 操作中禁用按钮
+                        button.addEventListener('click', () => {
+                            useSkillOnAlly(index);
+                        });
+                        targetButtons.appendChild(button);
+                    }
+                });
+            }
+            // 资源类技能
+            else if (skill.type === 'resource') {
+                const button = document.createElement('button');
+                button.className = 'px-4 py-2 rounded-lg bg-dark/70 hover:bg-primary/30 transition-colors w-full';
+                button.textContent = '使用技能';
+                button.disabled = isProcessingAction; // 操作中禁用按钮
+                button.addEventListener('click', () => {
+                    useResourceSkill();
+                });
+                targetButtons.appendChild(button);
+            }
+            // 特殊技能
+            else if (skill.type === 'special') {
+                const button = document.createElement('button');
+                button.className = 'px-4 py-2 rounded-lg bg-dark/70 hover:bg-accent/30 transition-colors w-full';
+                button.textContent = '使用特殊技能';
+                button.disabled = isProcessingAction; // 操作中禁用按钮
+                button.addEventListener('click', () => {
+                    useSpecialSkill();
+                });
+                targetButtons.appendChild(button);
+            }
+        }
+
+        // 使用技能攻击目标
+        function useSkillOnTarget(targetIndex) {
+            // 检查是否正在处理操作
+            if (isProcessingAction) return;
+
+            if (selectedCharacter === null || selectedSkill === null) return;
+
+            // 锁定操作
+            isProcessingAction = true;
+
+            const attacker = playerTeam[selectedCharacter];
+            const target = enemyTeam[targetIndex];
+            let skill;
+
+            if (selectedSkill === 'copied' && attacker.copiedSkill) {
+                skill = attacker.copiedSkill;
+                attacker.copiedSkill = null;
+            } else {
+                skill = attacker.skills[selectedSkill];
+            }
+
+            // 检查冷却
+            if (attacker.skillCooldowns[selectedSkill] > 0) {
+                addBattleLog(`${skill.name}还在冷却中（剩余${attacker.skillCooldowns[selectedSkill]}回合）`);
+                isProcessingAction = false; // 解锁
+                return;
+            }
+
+            // 记录日志
+            addBattleLog(`${attacker.name}使用了${skill.name}，目标是${target.name}`);
+
+            // 计算伤害
+            let damage = 0;
+            if (skill.damageFormula) {
+                damage = skill.damageFormula(attacker, target);
+            }
+
+            // 应用伤害
+            if (damage > 0) {
+                target.current_hp = Math.max(0, target.current_hp - damage);
+                if (target.current_hp <= 0) {
+                    target.isAlive = false;
+                    addBattleLog(`${target.name}被击败了！`);
+                } else {
+                    addBattleLog(`${target.name}受到了${damage}点伤害！`);
+                }
+            }
+
+            // 应用debuff
+            if (skill.debuff) {
+                applyDebuff('enemy', targetIndex, skill.debuff);
+            }
+
+            // 设置冷却
+            if (skill.cooldown) {
+                attacker.skillCooldowns[selectedSkill] = skill.cooldown;
+            } else {
+                // 默认冷却1回合
+                attacker.skillCooldowns[selectedSkill] = 1;
+            }
+
+            // 更新UI
+            updateTeamDisplays();
+
+            // 检查战斗结果
+            setTimeout(() => {
+                if (checkBattleResult()) {
+                    isProcessingAction = false; // 战斗结束解锁
+                    return;
+                }
+
+                // 敌方回合
+                addBattleLog('敌方回合开始！');
+                setTimeout(() => {
+                    enemyTurn();
+                    // 回合结束，解锁操作
+                    setTimeout(() => {
+                        currentTurn++;
+                        currentTurnDisplay.textContent = currentTurn;
+                        updateCooldowns();
+                        updateBuffs();
+                        updateTeamDisplays();
+                        updateCharacterSelection();
+                        addBattleLog(`第${currentTurn}回合开始！`);
+                        isProcessingAction = false; // 解锁
+                    }, 1500);
+                }, 1000);
+            }, 1000);
+        }
+
+        // 添加战斗日志
+        function addBattleLog(message) {
+            const logEntry = document.createElement('p');
+            logEntry.className = 'mb-1';
+            logEntry.innerHTML = `<span class="text-primary">[${new Date().toLocaleTimeString()}]</span> ${message}`;
+            battleLogContainer.appendChild(logEntry);
+            battleLogContainer.scrollTop = battleLogContainer.scrollHeight;
+        }
+
+        // 检查战斗结果
+        function checkBattleResult() {
+            const allEnemiesDead = enemyTeam.every(enemy => !enemy.isAlive);
+            const allPlayersDead = playerTeam.every(player => !player.isAlive);
+
+            if (allEnemiesDead) {
+                showBattleResult(true);
+                return true;
+            } else if (allPlayersDead) {
+                showBattleResult(false);
+                return true;
+            }
+
+            return false;
+        }
+
+        // 显示战斗结果
+        function showBattleResult(isVictory) {
+            resultTitle.textContent = isVictory ? '胜利！' : '失败！';
+            resultMessage.textContent = isVictory
+                ? `恭喜你在第${currentTurn}回合赢得了战斗！`
+                : `很遗憾，你在第${currentTurn}回合被击败了！`;
+            resultIcon.innerHTML = isVictory
+                ? '<i class="fas fa-trophy text-warning animate-bounce"></i>'
+                : '<i class="fas fa-skull-crossbones text-danger animate-pulse"></i>';
+            gameResultModal.classList.remove('hidden');
+        }
+
+        // 敌方回合
+        function enemyTurn() {
+            // 选择一个存活的敌方角色
+            const aliveEnemies = enemyTeam.filter(enemy => enemy.isAlive);
+            if (aliveEnemies.length === 0) return;
+
+            const randomEnemyIndex = Math.floor(Math.random() * aliveEnemies.length);
+            const enemy = aliveEnemies[randomEnemyIndex];
+            const enemyOriginalIndex = enemyTeam.indexOf(enemy);
+
+            // 选择一个可用技能
+            const availableSkills = [];
+            enemy.skills.forEach((skill, index) => {
+                if (enemy.skillCooldowns[index] <= 0) {
+                    availableSkills.push(index);
+                }
+            });
+
+            if (availableSkills.length === 0) {
+                addBattleLog(`${enemy.name}没有可用技能！`);
+                return;
+            }
+
+            const randomSkillIndex = availableSkills[Math.floor(Math.random() * availableSkills.length)];
+            const skill = enemy.skills[randomSkillIndex];
+
+            // 选择目标
+            const alivePlayers = playerTeam.filter(player => player.isAlive);
+            if (alivePlayers.length === 0) return;
+
+            const randomTargetIndex = Math.floor(Math.random() * alivePlayers.length);
+            const target = alivePlayers[randomTargetIndex];
+
+            // 使用技能
+            addBattleLog(`${enemy.name}使用了${skill.name}，目标是${target.name}`);
+
+            // 计算伤害
+            let damage = 0;
+            if (skill.damageFormula) {
+                damage = skill.damageFormula(enemy, target);
+            }
+
+            // 应用伤害
+            if (damage > 0) {
+                target.current_hp = Math.max(0, target.current_hp - damage);
+                if (target.current_hp <= 0) {
+                    target.isAlive = false;
+                    addBattleLog(`${target.name}被击败了！`);
+                } else {
+                    addBattleLog(`${target.name}受到了${damage}点伤害！`);
+                }
+            }
+
+            // 应用debuff
+            if (skill.debuff) {
+                applyDebuff('player', playerTeam.indexOf(target), skill.debuff);
+            }
+
+            // 设置冷却
+            if (skill.cooldown) {
+                enemy.skillCooldowns[randomSkillIndex] = skill.cooldown;
+            } else {
+                enemy.skillCooldowns[randomSkillIndex] = 1;
+            }
+
+            // 更新UI
+            updateTeamDisplays();
+        }
+
+        // 应用Debuff
+        function applyDebuff(team, targetIndex, debuff) {
+            const targetName = team === 'player'
+                ? playerTeam[targetIndex].name
+                : enemyTeam[targetIndex].name;
+
+            addBattleLog(`${targetName}受到了${debuff.type}效果影响，持续${debuff.duration}回合！`);
+
+            buffs[team].push({
+                targetIndex,
+                type: debuff.type,
+                value: debuff.value,
+                duration: debuff.duration
+            });
+        }
+
+        // 更新冷却时间
+        function updateCooldowns() {
+            // 玩家技能冷却
+            playerTeam.forEach(character => {
+                character.skillCooldowns.forEach((cooldown, index) => {
+                    if (cooldown > 0) {
+                        character.skillCooldowns[index]--;
+                    }
+                });
+            });
+
+            // 敌方技能冷却
+            enemyTeam.forEach(character => {
+                character.skillCooldowns.forEach((cooldown, index) => {
+                    if (cooldown > 0) {
+                        character.skillCooldowns[index]--;
+                    }
+                });
+            });
+        }
+
+        // 更新buff效果
+        function updateBuffs() {
+            // 更新玩家buff
+            buffs.player.forEach((buff, index) => {
+                buff.duration--;
+                if (buff.duration <= 0) {
+                    const target = playerTeam[buff.targetIndex];
+                    addBattleLog(`${target.name}的${buff.type}效果消失了！`);
+                    buffs.player.splice(index, 1);
+                }
+            });
+
+            // 更新敌方buff
+            buffs.enemy.forEach((buff, index) => {
+                buff.duration--;
+                if (buff.duration <= 0) {
+                    const target = enemyTeam[buff.targetIndex];
+                    addBattleLog(`${target.name}的${buff.type}效果消失了！`);
+                    buffs.enemy.splice(index, 1);
+                }
+            });
+        }
+
+        // 重新开始游戏
+        function restartGame() {
+            gameScreen.classList.add('opacity-0', 'translate-y-10');
+            setTimeout(() => {
+                gameScreen.classList.add('hidden');
+                characterSelectScreen.classList.remove('hidden');
+                setTimeout(() => {
+                    characterSelectScreen.classList.remove('opacity-0', 'translate-y-10');
+                    selectedCharacters = [];
+                    updateSelectedCharacters();
+                }, 50);
+            }, 500);
+        }
+
+        // 重置游戏
+        function resetGame() {
+            selectedCharacters = [];
+            playerTeam = [];
+            enemyTeam = [];
+            currentTurn = 1;
+            selectedCharacter = null;
+            selectedSkill = null;
+            isProcessingAction = false;
+            updateSelectedCharacters();
+        }
+
+        // 以下是其他技能使用的辅助函数（根据实际游戏逻辑补充）
+        function useSkillOnAllEnemies() {
+            // 实现群体技能逻辑（类似useSkillOnTarget，但目标是所有敌方）
+            if (isProcessingAction) return;
+            isProcessingAction = true;
+
+            // 技能逻辑实现...
+
+            // 处理完成后解锁
+            setTimeout(() => {
+                isProcessingAction = false;
+            }, 1000);
+        }
+
+        function useSkillOnAlly(targetIndex) {
+            // 实现队友技能逻辑
+            if (isProcessingAction) return;
+            isProcessingAction = true;
+
+            // 技能逻辑实现...
+
+            // 处理完成后解锁
+            setTimeout(() => {
+                isProcessingAction = false;
+            }, 1000);
+        }
+
+        function useResourceSkill() {
+            // 实现资源类技能逻辑
+            if (isProcessingAction) return;
+            isProcessingAction = true;
+
+            // 技能逻辑实现...
+
+            // 处理完成后解锁
+            setTimeout(() => {
+                isProcessingAction = false;
+            }, 1000);
+        }
+
+        function useSpecialSkill() {
+            // 实现特殊技能逻辑
+            if (isProcessingAction) return;
+            isProcessingAction = true;
+
+            // 技能逻辑实现...
+
+            // 处理完成后解锁
+            setTimeout(() => {
+                isProcessingAction = false;
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

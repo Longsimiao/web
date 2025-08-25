@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班级乱斗 - 登录</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="common.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366F1',
+                        secondary: '#EC4899',
+                        accent: '#8B5CF6',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                        dark: '#1F2937',
+                        light: '#F3F4F6'
+                    },
+                    transitionProperty: {
+                        'height': 'height',
+                        'spacing': 'margin, padding',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gradient-game min-h-screen text-white font-sans overflow-x-hidden">
+    <!-- 登录界面 -->
+    <div id="loginScreen" class="flex flex-col items-center justify-center min-h-screen px-4 screen-transition">
+        <div class="bg-dark/70 backdrop-blur-lg p-8 rounded-xl border border-primary/30 w-full max-w-md">
+            <h2 class="text-[clamp(1.75rem,5vw,2.5rem)] font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-6 text-center text-shadow">
+                班级乱斗
+            </h2>
+
+            <div class="mb-6">
+                <h3 id="authTitle" class="text-xl font-bold mb-4 text-primary text-center">用户登录</h3>
+
+                <div class="space-y-4">
+                    <div>
+                        <label for="username" class="block text-light/80 mb-2">用户名</label>
+                        <input type="text" id="username"
+                            class="w-full bg-dark/50 border border-primary/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                            placeholder="请输入用户名">
+                    </div>
+
+                    <div>
+                        <label for="password" class="block text-light/80 mb-2">密码</label>
+                        <input type="password" id="password"
+                            class="w-full bg-dark/50 border border-primary/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                            placeholder="请输入密码">
+                    </div>
+
+                    <div id="authError" class="hidden text-danger text-center py-2"></div>
+
+                    <button id="authSubmitButton" class="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-primary/50 shadow-lg shadow-primary/30">
+                        登录
+                    </button>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <span class="text-light/70">
+                    <span id="authToggleText">还没有账号？</span>
+                    <button id="authToggleButton" class="text-primary hover:text-primary/80 font-bold ml-1">
+                        注册账号
+                    </button>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        // 登录注册相关逻辑
+        let isRegisterMode = false;
+
+        // DOM元素
+        const authTitle = document.getElementById('authTitle');
+        const authToggleText = document.getElementById('authToggleText');
+        const authToggleButton = document.getElementById('authToggleButton');
+        const authSubmitButton = document.getElementById('authSubmitButton');
+        const authError = document.getElementById('authError');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+
+        // 页面加载时检查登录状态
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 如果已登录，直接跳转到游戏页面
+            const isLoggedIn = await checkLoginStatus();
+            if (isLoggedIn) {
+                window.location.href = 'game.html';
+            }
+            initAuthEventListeners();
+        });
+
+        // 初始化登录注册事件监听
+        function initAuthEventListeners() {
+            // 切换登录/注册模式
+            authToggleButton.addEventListener('click', () => {
+                isRegisterMode = !isRegisterMode;
+                if (isRegisterMode) {
+                    authTitle.textContent = '用户注册';
+                    authToggleText.textContent = '已有账号？';
+                    authToggleButton.textContent = '登录账号';
+                    authSubmitButton.textContent = '注册';
+                } else {
+                    authTitle.textContent = '用户登录';
+                    authToggleText.textContent = '还没有账号？';
+                    authToggleButton.textContent = '注册账号';
+                    authSubmitButton.textContent = '登录';
+                }
+                authError.classList.add('hidden');
+            });
+
+            // 提交登录/注册表单
+            authSubmitButton.addEventListener('click', async () => {
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value.trim();
+
+                if (!username || !password) {
+                    showMessage(authError, '用户名和密码不能为空');
+                    return;
+                }
+
+                try {
+                    let response;
+                    if (isRegisterMode) {
+                        // 注册请求
+                        response = await fetch(`${API_URL}/register`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username, password })
+                        });
+                    } else {
+                        // 登录请求
+                        response = await fetch(`${API_URL}/login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username, password })
+                        });
+                    }
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.message || '操作失败');
+                    }
+
+                    // 登录成功后保存token
+                    if (!isRegisterMode) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                    }
+
+                    // 显示成功消息并跳转
+                    showMessage(authError, isRegisterMode ? '注册成功，请登录' : '登录成功，正在进入游戏...', false);
+                    setTimeout(() => {
+                        if (!isRegisterMode) {
+                            // 登录成功跳转到游戏页面
+                            window.location.href = 'game.html';
+                        } else {
+                            // 注册成功后切换到登录模式
+                            authToggleButton.click();
+                        }
+                        usernameInput.value = '';
+                        passwordInput.value = '';
+                    }, 1500);
+
+                } catch (error) {
+                    showMessage(authError, error.message);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+/* 公共样式 */
+.text-shadow {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+.text-shadow-lg {
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.7);
+}
+.card-hover {
+    transition: all 0.3s ease;
+}
+.card-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+.animate-float {
+    animation: float 3s ease-in-out infinite;
+}
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+.bg-gradient-game {
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+}
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.screen-transition {
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
